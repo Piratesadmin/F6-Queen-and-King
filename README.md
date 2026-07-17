@@ -104,3 +104,18 @@ template.
 
 The opening round can still use all four courts because every team begins in
 the Championship competition.
+
+
+## Two-court Round 2 pathway
+
+When Round 2 has only two active Championship courts:
+
+- Only the bottom team on each Championship court moves to Plate
+- With four teams on each court, six Championship teams remain
+- Round 3 is automatically split into two Championship courts of three
+- The top two teams on each Round 3 court qualify
+- The higher-scoring third-place team across the two courts also qualifies
+- The final contains five teams
+
+The best-third-place tie-break remains Round 3 score, then cumulative score,
+then team name alphabetically.

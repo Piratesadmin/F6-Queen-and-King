@@ -76,7 +76,11 @@ function makeCourts(champ,plate,layout){
   const smallEvent=state.teams.length>=15&&state.teams.length<=19;
   let champCourtCount;
 
-  if(smallEvent&&state.round>=2&&champ.length>=4){
+  if(state.round===3&&champ.length===6){
+    // Special pathway: six remaining Championship teams must play
+    // on two semifinal courts of three.
+    champCourtCount=2;
+  }else if(smallEvent&&state.round>=2&&champ.length>=4){
     // In smaller events, use one Championship court for every four
     // Championship teams instead of forcing the round template's court count.
     // Example: 8 Championship teams become two courts of four, leaving
@@ -161,7 +165,14 @@ function render(){
   const activePlateCourts=state.courts.filter(c=>c.type==="plate"&&c.teams.length).length;
 
   if(state.round===3){
-    $("#roundSummary").textContent="Semifinal: the top two from each court plus the best third-placed team reach the five-team final.";
+    const champSizes=state.courts
+      .filter(c=>c.type==="championship"&&c.teams.length)
+      .map(c=>c.teams.length);
+    const threePerCourt=champSizes.length===2&&champSizes.every(size=>size===3);
+
+    $("#roundSummary").textContent=threePerCourt
+      ?"Semifinal: three teams per court. The top two on each court plus the higher-scoring third-place team reach the five-team final."
+      :"Semifinal: the top two from each court plus the best third-placed team reach the five-team final.";
   }else if(state.round>=4){
     $("#roundSummary").textContent=`Final on ${activeChampCourts} Championship court, with ${activePlateCourts} active Plate courts keeping everyone else playing.`;
   }else{
@@ -194,15 +205,23 @@ function getRoundOutcome(){
     return {movers,wildcard,automaticQualifiers};
   }
 
+  const twoCourtRoundTwo=state.round===2&&champCourts.length===2;
+
   const movers=champCourts.flatMap(c=>{
     const rank=sorted(c.teams);
-    // Never eliminate so many teams that fewer than two remain on a court.
-    // Examples: 6 teams -> eliminate 2; 4 teams -> eliminate 2;
-    // 3 teams -> eliminate 1; 2 teams -> eliminate 0.
+
+    // When Round 2 has only two Championship courts, only the bottom
+    // team on each court moves to Plate.
+    if(twoCourtRoundTwo){
+      return rank.length>2?rank.slice(-1):[];
+    }
+
+    // Standard rule: always leave at least two teams progressing.
     const cut=Math.min(state.eliminationCount,Math.max(0,rank.length-2));
-    return rank.slice(-cut);
+    return cut?rank.slice(-cut):[];
   });
-  return {movers,wildcard:null};
+
+  return {movers,wildcard:null,twoCourtRoundTwo};
 }
 
 function renderCourts(){
@@ -290,6 +309,10 @@ $("#advanceBtn").addEventListener("click",()=>{
   if(state.round===3 && outcome.wildcard){
     const qualifierNames=(outcome.automaticQualifiers||[]).map(t=>t.name).join(", ");
     $("#confirmText").textContent=`${qualifierNames} qualify by finishing in the top two on their courts. ${outcome.wildcard.name} qualifies as the best third-placed team. The final will therefore have five teams. ${movers.map(t=>t.name).join(", ")} will move into Plate play.`;
+  }else if(state.round===2&&outcome.twoCourtRoundTwo){
+    $("#confirmText").textContent=
+      `${movers.map(t=>t.name).join(" and ")} will move into Plate play. `+
+      `The remaining six Championship teams will be split into two Round 3 courts of three.`;
   }else{
     $("#confirmText").textContent=movers.length
       ?`${movers.map(t=>t.name).join(", ")} will move into Plate play.`
