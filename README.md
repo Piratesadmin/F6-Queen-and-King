@@ -155,3 +155,11 @@ When the Teams sidebar is hidden, the tournament layout now switches from a
 two-column grid to a single full-width column. This prevents the timer, court
 controls, statistics, and scoreboards from being compressed into the remaining
 space.
+
+
+## Full-width hidden-sidebar correction
+
+The hidden Teams sidebar now changes the tournament wrapper from a grid into a
+full-width block layout. Width limits are explicitly removed from the
+tournament view, main content area, round controls, court controls, statistics,
+scoreboards, standings, and history panels.

@@ -186,6 +186,18 @@ function renderTeamSidebar(){
   const visible=state.teamSidebarVisible!==false;
   sidebar.classList.toggle("hidden-sidebar",!visible);
   layout.classList.toggle("sidebar-hidden",!visible);
+
+  // Explicitly reset the layout width when the sidebar is hidden.
+  if(visible){
+    layout.style.display="";
+    layout.style.gridTemplateColumns="";
+    layout.style.width="";
+  }else{
+    layout.style.display="block";
+    layout.style.gridTemplateColumns="none";
+    layout.style.width="100%";
+  }
+
   toggle.textContent=visible?"Hide teams":"Show teams";
   toggle.setAttribute("aria-expanded",String(visible));
 

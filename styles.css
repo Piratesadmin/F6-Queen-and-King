@@ -191,3 +191,40 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
 .tournament-layout.sidebar-hidden .tournament-main{
   width:100%;
 }
+
+#tournamentView{
+  width:100%;
+  max-width:none;
+}
+
+.tournament-layout{
+  width:100%;
+  max-width:none;
+}
+
+.tournament-main{
+  width:100%;
+  max-width:none;
+}
+
+.tournament-layout.sidebar-hidden{
+  display:block;
+  width:100%;
+  max-width:none;
+}
+
+.tournament-layout.sidebar-hidden .tournament-main{
+  display:block;
+  width:100%;
+  max-width:none;
+}
+
+.tournament-layout.sidebar-hidden .round-bar,
+.tournament-layout.sidebar-hidden .court-control-card,
+.tournament-layout.sidebar-hidden .stats-row,
+.tournament-layout.sidebar-hidden #courts,
+.tournament-layout.sidebar-hidden .standings-card,
+.tournament-layout.sidebar-hidden .history-card{
+  width:100%;
+  max-width:none;
+}
