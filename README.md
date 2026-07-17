@@ -57,3 +57,32 @@ The best-third-place tie-break is:
 3. Team name alphabetically
 
 Second-place teams do not qualify under this format. All non-qualifiers move into Plate play.
+
+
+## Minimum two progressing from each court
+
+During normal Championship rounds, the app never eliminates enough teams to leave fewer than two progressing from a court.
+
+- 6 teams: bottom 2 move to Plate
+- 5 teams: bottom 2 move to Plate
+- 4 teams: bottom 2 move to Plate
+- 3 teams: bottom 1 moves to Plate
+- 2 teams: no teams move to Plate
+
+The special Round 3 rule remains unchanged: the winner of each semifinal court and the best third-place team qualify for the three-team final.
+
+
+## Live standings table
+
+The tournament screen includes a live table that updates whenever a score changes.
+
+It shows:
+
+- Overall rank
+- Team name
+- Championship or Plate status
+- Current court
+- Current-round score
+- Cumulative tournament points
+
+Championship teams are listed above Plate teams. Within each competition, teams are ranked by cumulative points including their live current-round score.

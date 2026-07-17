@@ -131,6 +131,7 @@ function render(){
     $("#roundSummary").textContent=`${layout.championship} Championship court${layout.championship===1?"":"s"} and ${layout.plate} Plate court${layout.plate===1?"":"s"}.`;
   }
   renderCourts();
+  renderStandings();
   renderHistory();
   $("#undoBtn").disabled=!state.snapshots.length;
 }
@@ -156,7 +157,10 @@ function getRoundOutcome(){
 
   const movers=champCourts.flatMap(c=>{
     const rank=sorted(c.teams);
-    const cut=Math.min(state.eliminationCount,Math.max(0,rank.length-1));
+    // Never eliminate so many teams that fewer than two remain on a court.
+    // Examples: 6 teams -> eliminate 2; 4 teams -> eliminate 2;
+    // 3 teams -> eliminate 1; 2 teams -> eliminate 0.
+    const cut=Math.min(state.eliminationCount,Math.max(0,rank.length-2));
     return rank.slice(-cut);
   });
   return {movers,wildcard:null};
@@ -207,7 +211,9 @@ function changeScore(teamId,delta){
   const t=state.teams.find(x=>x.id===teamId);
   if(!t)return;
   t.score=Math.max(0,t.score+delta);
-  persist();renderCourts();
+  persist();
+  renderCourts();
+  renderStandings();
 }
 
 function renderTimer(){
@@ -295,6 +301,38 @@ $("#undoBtn").addEventListener("click",()=>{
   state={...previous,snapshots:remainingSnapshots,timerRunning:false,timerId:null};
   persist();render();
 });
+
+
+function teamCourt(teamId){
+  const court=state.courts.find(c=>c.teams.some(t=>t.id===teamId));
+  return court?`Court ${court.number}`:"—";
+}
+
+function renderStandings(){
+  const body=$("#standingsBody");
+  if(!body)return;
+
+  const ranked=[...state.teams].sort((a,b)=>{
+    const statusOrder=(a.status==="championship"?0:1)-(b.status==="championship"?0:1);
+    if(statusOrder!==0)return statusOrder;
+
+    const totalA=a.total+a.score;
+    const totalB=b.total+b.score;
+    return totalB-totalA || b.score-a.score || a.name.localeCompare(b.name);
+  });
+
+  body.innerHTML=ranked.map((team,index)=>{
+    const total=team.total+team.score;
+    return `<tr class="${index===0?"current-leader":""}">
+      <td class="rank-cell">${index+1}</td>
+      <td class="team-cell">${esc(team.name)}</td>
+      <td><span class="comp-chip ${team.status}">${esc(team.status)}</span></td>
+      <td>${teamCourt(team.id)}</td>
+      <td class="numeric">${team.score}</td>
+      <td class="numeric">${total}</td>
+    </tr>`;
+  }).join("");
+}
 
 function renderHistory(){
   const root=$("#history");

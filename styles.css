@@ -127,3 +127,25 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   .team-row{grid-template-columns:1fr}
   .scorebox{justify-content:space-between}
 }
+
+.standings-card{padding:1.2rem;margin-top:1rem}
+.table-scroll{overflow-x:auto;margin-top:.8rem}
+.standings-table{width:100%;border-collapse:collapse;min-width:720px}
+.standings-table th,.standings-table td{
+  padding:.8rem .75rem;text-align:left;border-bottom:1px solid var(--line)
+}
+.standings-table th{
+  color:var(--muted);font-size:.75rem;text-transform:uppercase;
+  letter-spacing:.07em
+}
+.standings-table tbody tr:last-child td{border-bottom:0}
+.standings-table tbody tr.current-leader{background:rgba(34,197,94,.08)}
+.rank-cell{font-weight:1000;width:62px}
+.team-cell{font-weight:900}
+.comp-chip{
+  display:inline-block;border-radius:999px;padding:.28rem .55rem;
+  font-size:.7rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em
+}
+.comp-chip.championship{background:rgba(139,92,246,.18);color:#d8ccff}
+.comp-chip.plate{background:rgba(34,197,94,.15);color:#b8f7c8}
+.numeric{text-align:right!important;font-variant-numeric:tabular-nums;font-weight:900}
