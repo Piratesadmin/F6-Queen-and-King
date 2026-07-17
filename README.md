@@ -147,3 +147,11 @@ The app displays a warning whenever limited court availability pauses or reduces
 - Reticking restores the team to its previous Championship or Plate competition
 - The sidebar can be hidden and reopened
 - Select All and Clear All controls are included
+
+
+## Sidebar layout fix
+
+When the Teams sidebar is hidden, the tournament layout now switches from a
+two-column grid to a single full-width column. This prevents the timer, court
+controls, statistics, and scoreboards from being compressed into the remaining
+space.

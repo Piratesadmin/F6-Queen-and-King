@@ -177,10 +177,15 @@ function sorted(teams){
 
 
 function renderTeamSidebar(){
-  const sidebar=$("#teamSidebar"), toggle=$("#teamSidebarToggle"), root=$("#teamChecklist");
-  if(!sidebar||!toggle||!root)return;
+  const sidebar=$("#teamSidebar");
+  const toggle=$("#teamSidebarToggle");
+  const root=$("#teamChecklist");
+  const layout=document.querySelector(".tournament-layout");
+  if(!sidebar||!toggle||!root||!layout)return;
+
   const visible=state.teamSidebarVisible!==false;
   sidebar.classList.toggle("hidden-sidebar",!visible);
+  layout.classList.toggle("sidebar-hidden",!visible);
   toggle.textContent=visible?"Hide teams":"Show teams";
   toggle.setAttribute("aria-expanded",String(visible));
 
