@@ -73,15 +73,49 @@ function distribute(items,count){
 
 function makeCourts(champ,plate,layout){
   const courts=[];
-  distribute(champ,Math.min(layout.championship,Math.max(1,champ.length))).forEach(group=>{
-    courts.push({number:courts.length+1,type:"championship",teams:group});
+  const smallEvent=state.teams.length>=15&&state.teams.length<=19;
+  let champCourtCount;
+
+  if(smallEvent&&state.round>=2&&champ.length>=4){
+    // In smaller events, use one Championship court for every four
+    // Championship teams instead of forcing the round template's court count.
+    // Example: 8 Championship teams become two courts of four, leaving
+    // the other two courts available for Plate play.
+    champCourtCount=Math.min(4,Math.max(1,Math.floor(champ.length/4)));
+  }else{
+    champCourtCount=Math.min(layout.championship,Math.max(1,champ.length));
+  }
+
+  const championshipGroups=distribute(champ,champCourtCount);
+  championshipGroups.forEach(group=>{
+    courts.push({
+      number:courts.length+1,
+      type:"championship",
+      teams:group
+    });
   });
-  if(plate.length){
-    distribute(plate,Math.min(layout.plate,plate.length)).forEach(group=>{
-      courts.push({number:courts.length+1,type:"plate",teams:group});
+
+  // Every court not required for Championship play becomes a Plate court.
+  // This lets all Plate teams be balanced across the remaining courts.
+  const availablePlateCourts=Math.max(0,4-courts.length);
+  if(plate.length&&availablePlateCourts){
+    distribute(plate,Math.min(availablePlateCourts,plate.length)).forEach(group=>{
+      courts.push({
+        number:courts.length+1,
+        type:"plate",
+        teams:group
+      });
     });
   }
-  while(courts.length<4)courts.push({number:courts.length+1,type:"plate",teams:[]});
+
+  while(courts.length<4){
+    courts.push({
+      number:courts.length+1,
+      type:"plate",
+      teams:[]
+    });
+  }
+
   return courts.slice(0,4);
 }
 
@@ -123,12 +157,17 @@ function render(){
   $("#plateCount").textContent=plate.length;
   $("#playingCount").textContent=state.teams.length;
   const layout=layouts[Math.min(state.round-1,layouts.length-1)];
+  const activeChampCourts=state.courts.filter(c=>c.type==="championship"&&c.teams.length).length;
+  const activePlateCourts=state.courts.filter(c=>c.type==="plate"&&c.teams.length).length;
+
   if(state.round===3){
     $("#roundSummary").textContent="Semifinal: the top two from each court plus the best third-placed team reach the five-team final.";
   }else if(state.round>=4){
-    $("#roundSummary").textContent=`Final on 1 Championship court, with ${layout.plate} Plate courts keeping everyone else playing.`;
+    $("#roundSummary").textContent=`Final on ${activeChampCourts} Championship court, with ${activePlateCourts} active Plate courts keeping everyone else playing.`;
   }else{
-    $("#roundSummary").textContent=`${layout.championship} Championship court${layout.championship===1?"":"s"} and ${layout.plate} Plate court${layout.plate===1?"":"s"}.`;
+    $("#roundSummary").textContent=
+      `${activeChampCourts} Championship court${activeChampCourts===1?"":"s"} and `+
+      `${activePlateCourts} active Plate court${activePlateCourts===1?"":"s"}.`;
   }
   renderCourts();
   renderStandings();

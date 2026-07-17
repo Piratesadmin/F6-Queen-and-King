@@ -86,3 +86,21 @@ It shows:
 - Cumulative tournament points
 
 Championship teams are listed above Plate teams. Within each competition, teams are ranked by cumulative points including their live current-round score.
+
+
+## Small-event court allocation: 15–19 teams
+
+From Round 2 onward, tournaments with 15–19 total teams use approximately one
+Championship court for every four remaining Championship teams.
+
+The main intended case is:
+
+- 8 Championship teams → two Championship courts of four
+- All Plate teams → split evenly across Courts 3 and 4
+
+Unused Championship courts automatically become Plate courts, rather than
+forcing the standard 3 Championship + 1 Plate or 2 Championship + 2 Plate
+template.
+
+The opening round can still use all four courts because every team begins in
+the Championship competition.
