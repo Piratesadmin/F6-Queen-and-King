@@ -1,392 +1,316 @@
-const $ = (selector) => document.querySelector(selector);
+const $ = s => document.querySelector(s);
 
-const setupPanel = $("#setupPanel");
-const tournamentPanel = $("#tournamentPanel");
-const courtsGrid = $("#courtsGrid");
-const teamInput = $("#teamInput");
-const teamCountSelect = $("#teamCount");
-const enteredCount = $("#enteredCount");
-const timerEl = $("#timer");
-const roundBadge = $("#roundBadge");
-const championshipCount = $("#championshipCount");
-const plateCount = $("#plateCount");
-const totalCount = $("#totalCount");
-const historyEl = $("#history");
-const confirmDialog = $("#confirmDialog");
-const dialogMessage = $("#dialogMessage");
-
-let state = {
-  round: 0,
-  roundSeconds: 900,
-  remainingSeconds: 900,
-  eliminationCount: 2,
-  teams: [],
-  courts: [],
-  timerRunning: false,
-  timerId: null,
-  history: []
-};
-
-const ROUND_LAYOUTS = [
-  { championship: 4, plate: 0 },
-  { championship: 3, plate: 1 },
-  { championship: 2, plate: 2 },
-  { championship: 1, plate: 3 }
+const layouts = [
+  {championship:4, plate:0},
+  {championship:3, plate:1},
+  {championship:2, plate:2},
+  {championship:1, plate:3}
 ];
 
-function saveState() {
-  const copy = { ...state, timerRunning: false, timerId: null };
-  localStorage.setItem("kqScoreboardState", JSON.stringify(copy));
+let state = {
+  round:0,
+  roundLength:900,
+  remaining:900,
+  eliminationCount:2,
+  teams:[],
+  courts:[],
+  history:[],
+  snapshots:[],
+  timerRunning:false,
+  timerId:null
+};
+
+const teamCount = $("#teamCount");
+for(let n=15;n<=25;n++){
+  const o=document.createElement("option");
+  o.value=n;o.textContent=n;
+  if(n===22)o.selected=true;
+  teamCount.appendChild(o);
 }
 
-function loadState() {
-  const saved = localStorage.getItem("kqScoreboardState");
-  if (!saved) return false;
-  try {
-    state = { ...state, ...JSON.parse(saved), timerRunning: false, timerId: null };
-    return state.round > 0 && state.teams.length > 0;
-  } catch {
-    return false;
+function esc(v){
+  return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+}
+
+function renderTeamInputs(preserve=true){
+  const count=Number(teamCount.value);
+  const old=preserve?[...document.querySelectorAll("#teamInputs input")].map(i=>i.value):[];
+  const wrap=$("#teamInputs");
+  wrap.innerHTML="";
+  for(let i=0;i<count;i++){
+    const div=document.createElement("div");
+    div.className="team-input-wrap";
+    div.innerHTML=`<span>${i+1}</span><input type="text" maxlength="40" placeholder="Team ${i+1}" value="${esc(old[i]||"")}">`;
+    div.querySelector("input").addEventListener("input",updateProgress);
+    wrap.appendChild(div);
   }
+  updateProgress();
 }
 
-function createTeams(names) {
-  return names.map((name, index) => ({
-    id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${index}`,
-    name,
-    status: "championship",
-    score: 0,
-    totalScore: 0
-  }));
+function updateProgress(){
+  const inputs=[...document.querySelectorAll("#teamInputs input")];
+  const complete=inputs.filter(i=>i.value.trim()).length;
+  $("#teamProgress").textContent=`${complete} / ${inputs.length} complete`;
+  $("#startBtn").disabled=complete!==inputs.length;
 }
 
-function balancedDistribute(teams, courtCount) {
-  if (courtCount <= 0) return [];
-  const groups = Array.from({ length: courtCount }, () => []);
-  teams.forEach((team, index) => groups[index % courtCount].push(team));
+teamCount.addEventListener("change",()=>renderTeamInputs(true));
+$("#fillDemoBtn").addEventListener("click",()=>{
+  [...document.querySelectorAll("#teamInputs input")].forEach((input,i)=>input.value=`Team ${i+1}`);
+  updateProgress();
+});
+
+function id(){
+  return (crypto.randomUUID&&crypto.randomUUID())||`${Date.now()}-${Math.random()}`;
+}
+
+function distribute(items,count){
+  if(count<=0)return[];
+  const groups=Array.from({length:count},()=>[]);
+  items.forEach((item,i)=>groups[i%count].push(item));
   return groups;
 }
 
-function buildCourts(champTeams, plateTeams, layout) {
-  const champGroups = balancedDistribute(champTeams, layout.championship);
-  const plateGroups = balancedDistribute(plateTeams, layout.plate);
-  const courts = [];
-
-  champGroups.forEach((teams, i) => {
-    courts.push({ id: `C${i+1}`, number: courts.length + 1, type: "championship", teams });
+function makeCourts(champ,plate,layout){
+  const courts=[];
+  distribute(champ,Math.min(layout.championship,Math.max(1,champ.length))).forEach(group=>{
+    courts.push({number:courts.length+1,type:"championship",teams:group});
   });
-  plateGroups.forEach((teams, i) => {
-    courts.push({ id: `P${i+1}`, number: courts.length + 1, type: "plate", teams });
-  });
-
-  while (courts.length < 4) {
-    courts.push({ id: `E${courts.length+1}`, number: courts.length + 1, type: "plate", teams: [] });
+  if(plate.length){
+    distribute(plate,Math.min(layout.plate,plate.length)).forEach(group=>{
+      courts.push({number:courts.length+1,type:"plate",teams:group});
+    });
   }
-  return courts;
+  while(courts.length<4)courts.push({number:courts.length+1,type:"plate",teams:[]});
+  return courts.slice(0,4);
 }
 
-function initialiseTournament() {
-  const requiredTeamCount = Number(teamCountSelect.value);
-  const names = teamInput.value
-    .split("\n")
-    .map(s => s.trim())
-    .filter(Boolean);
-
-  if (names.length !== requiredTeamCount) {
-    alert(`Please enter exactly ${requiredTeamCount} team names. You currently have ${names.length}.`);
-    return;
-  }
-
-  state.round = 1;
-  state.roundSeconds = Number($("#roundLength").value);
-  state.remainingSeconds = state.roundSeconds;
-  state.eliminationCount = Number($("#eliminationCount").value);
-  state.teams = createTeams(names);
-  state.history = [];
-  state.timerRunning = false;
-
-  const shuffled = [...state.teams].sort(() => Math.random() - 0.5);
-  state.courts = buildCourts(shuffled, [], ROUND_LAYOUTS[0]);
-
-  setupPanel.classList.add("hidden");
-  tournamentPanel.classList.remove("hidden");
-  saveState();
+function startTournament(){
+  const names=[...document.querySelectorAll("#teamInputs input")].map(i=>i.value.trim());
+  if(names.some(n=>!n))return;
+  state={
+    round:1,
+    roundLength:Number($("#roundLength").value),
+    remaining:Number($("#roundLength").value),
+    eliminationCount:Number($("#eliminationCount").value),
+    teams:names.map(name=>({id:id(),name,status:"championship",score:0,total:0})),
+    courts:[],
+    history:[],
+    snapshots:[],
+    timerRunning:false,
+    timerId:null
+  };
+  const shuffled=[...state.teams].sort(()=>Math.random()-.5);
+  state.courts=makeCourts(shuffled,[],layouts[0]);
+  $("#setupView").classList.add("hidden");
+  $("#tournamentView").classList.remove("hidden");
+  persist();
   render();
 }
+$("#startBtn").addEventListener("click",startTournament);
 
-function sortedTeams(teams) {
-  return [...teams].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+function sorted(teams){
+  return [...teams].sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
 }
 
-function renderCourts() {
-  courtsGrid.innerHTML = "";
-
-  state.courts.forEach(court => {
-    const sorted = sortedTeams(court.teams);
-    const eliminationStart = court.type === "championship"
-      ? Math.max(0, sorted.length - state.eliminationCount)
-      : Infinity;
-
-    const courtEl = document.createElement("article");
-    courtEl.className = "court";
-    courtEl.innerHTML = `
-      <div class="court-header">
-        <div class="court-title">Court ${court.number}</div>
-        <div class="court-type ${court.type}">
-          ${court.type === "championship" ? "Championship" : "Plate"}
-        </div>
-      </div>
-      <div class="team-list"></div>
-    `;
-
-    const list = courtEl.querySelector(".team-list");
-    if (!sorted.length) {
-      list.innerHTML = `<div class="empty-court">Court currently unused.</div>`;
-    } else {
-      sorted.forEach((team, index) => {
-        const row = document.createElement("div");
-        row.className = "team-row";
-        if (index === 0) row.classList.add("leading");
-        if (index >= eliminationStart && court.type === "championship") {
-          row.classList.add("elimination-zone");
-        }
-
-        row.innerHTML = `
-          <div class="team-meta">
-            <div class="team-name">${escapeHtml(team.name)}</div>
-            <div class="team-rank">
-              ${index === 0 ? "Leading" : `Position ${index + 1}`}
-              ${court.type === "championship" && index >= eliminationStart ? " · moving to Plate" : ""}
-            </div>
-          </div>
-          <div class="score-controls">
-            <button class="minus" aria-label="Subtract point">−</button>
-            <div class="score">${team.score}</div>
-            <button class="plus" aria-label="Add point">+</button>
-          </div>
-        `;
-
-        row.querySelector(".minus").addEventListener("click", () => changeScore(team.id, -1));
-        row.querySelector(".plus").addEventListener("click", () => changeScore(team.id, 1));
-        list.appendChild(row);
-      });
-    }
-    courtsGrid.appendChild(courtEl);
-  });
-}
-
-function changeScore(teamId, amount) {
-  const team = state.teams.find(t => t.id === teamId);
-  if (!team) return;
-  team.score = Math.max(0, team.score + amount);
-  saveState();
-  renderCourts();
-}
-
-function renderTimer() {
-  const mins = Math.floor(state.remainingSeconds / 60);
-  const secs = state.remainingSeconds % 60;
-  timerEl.textContent = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  timerEl.classList.toggle("warning", state.remainingSeconds <= 60 && state.remainingSeconds > 0);
-  timerEl.classList.toggle("finished", state.remainingSeconds === 0);
-  $("#startPauseBtn").textContent = state.timerRunning ? "Pause" : "Start";
-}
-
-function renderStatus() {
-  const champ = state.teams.filter(t => t.status === "championship").length;
-  const plate = state.teams.filter(t => t.status === "plate").length;
-  championshipCount.textContent = champ;
-  plateCount.textContent = plate;
-  totalCount.textContent = state.teams.length;
-  roundBadge.textContent = `Round ${state.round}`;
-}
-
-function renderHistory() {
-  if (!state.history.length) {
-    historyEl.innerHTML = `<p class="empty-court">No rounds completed yet.</p>`;
-    return;
-  }
-
-  historyEl.innerHTML = state.history
-    .slice()
-    .reverse()
-    .map(item => `
-      <div class="history-entry">
-        <strong>Round ${item.round} completed</strong>
-        <p>${escapeHtml(item.summary)}</p>
-      </div>
-    `).join("");
-}
-
-function render() {
+function render(){
   renderTimer();
-  renderStatus();
+  $("#roundTitle").textContent=`Round ${state.round}`;
+  $("#roundNumber").textContent=state.round;
+  const champ=state.teams.filter(t=>t.status==="championship");
+  const plate=state.teams.filter(t=>t.status==="plate");
+  $("#champCount").textContent=champ.length;
+  $("#plateCount").textContent=plate.length;
+  $("#playingCount").textContent=state.teams.length;
+  const layout=layouts[Math.min(state.round-1,layouts.length-1)];
+  $("#roundSummary").textContent=`${layout.championship} Championship court${layout.championship===1?"":"s"} and ${layout.plate} Plate court${layout.plate===1?"":"s"}.`;
   renderCourts();
   renderHistory();
+  $("#undoBtn").disabled=!state.snapshots.length;
 }
 
-function toggleTimer() {
-  if (state.timerRunning) {
-    stopTimer();
-    return;
-  }
-  state.timerRunning = true;
-  state.timerId = setInterval(() => {
-    state.remainingSeconds = Math.max(0, state.remainingSeconds - 1);
-    if (state.remainingSeconds === 0) stopTimer();
-    renderTimer();
-    saveState();
-  }, 1000);
-  renderTimer();
-}
-
-function stopTimer() {
-  state.timerRunning = false;
-  clearInterval(state.timerId);
-  state.timerId = null;
-  renderTimer();
-  saveState();
-}
-
-function resetTimer() {
-  stopTimer();
-  state.remainingSeconds = state.roundSeconds;
-  renderTimer();
-  saveState();
-}
-
-function resetScores() {
-  state.teams.forEach(team => {
-    team.totalScore += team.score;
-    team.score = 0;
+function renderCourts(){
+  const root=$("#courts");root.innerHTML="";
+  state.courts.forEach(court=>{
+    const list=sorted(court.teams);
+    const dropStart=court.type==="championship"?Math.max(0,list.length-state.eliminationCount):Infinity;
+    const article=document.createElement("article");
+    article.className="court card";
+    article.innerHTML=`<div class="court-head">
+      <div class="court-title">Court ${court.number}</div>
+      <div class="badge ${court.type}">${court.type}</div>
+    </div><div class="team-list"></div>`;
+    const box=article.querySelector(".team-list");
+    if(!list.length){
+      box.innerHTML='<div class="empty">Court not used this round.</div>';
+    }else{
+      list.forEach((team,index)=>{
+        const row=document.createElement("div");
+        row.className="team-row"+(index===0?" leader":"")+(index>=dropStart&&court.type==="championship"?" drop":"");
+        const moving=index>=dropStart&&court.type==="championship";
+        row.innerHTML=`<div><div class="team-name">${esc(team.name)}</div>
+          <div class="team-sub">${index===0?"Leading":`Position ${index+1}`}${moving?" · moves to Plate":""}</div></div>
+          <div class="scorebox"><button class="ghost minus">−</button><div class="score">${team.score}</div><button class="primary plus">+</button></div>`;
+        row.querySelector(".minus").onclick=()=>changeScore(team.id,-1);
+        row.querySelector(".plus").onclick=()=>changeScore(team.id,1);
+        box.appendChild(row);
+      });
+    }
+    root.appendChild(article);
   });
 }
 
-function advanceRound() {
-  stopTimer();
+function changeScore(teamId,delta){
+  const t=state.teams.find(x=>x.id===teamId);
+  if(!t)return;
+  t.score=Math.max(0,t.score+delta);
+  persist();renderCourts();
+}
 
-  const currentChampCourts = state.courts.filter(c => c.type === "championship" && c.teams.length);
-  const newlyPlate = [];
+function renderTimer(){
+  const m=Math.floor(state.remaining/60),s=state.remaining%60;
+  const el=$("#timer");
+  el.textContent=`${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  el.classList.toggle("warning",state.remaining<=60&&state.remaining>0);
+  el.classList.toggle("finished",state.remaining===0);
+  $("#timerToggleBtn").textContent=state.timerRunning?"Pause timer":"Start timer";
+}
+function stopTimer(){
+  state.timerRunning=false;
+  clearInterval(state.timerId);state.timerId=null;
+  renderTimer();persist();
+}
+$("#timerToggleBtn").addEventListener("click",()=>{
+  if(state.timerRunning){stopTimer();return;}
+  state.timerRunning=true;
+  state.timerId=setInterval(()=>{
+    state.remaining=Math.max(0,state.remaining-1);
+    if(state.remaining===0)stopTimer();
+    renderTimer();persist();
+  },1000);
+  renderTimer();
+});
+$("#timerResetBtn").addEventListener("click",()=>{stopTimer();state.remaining=state.roundLength;renderTimer();persist();});
 
-  currentChampCourts.forEach(court => {
-    const ranking = sortedTeams(court.teams);
-    const cut = Math.min(state.eliminationCount, Math.max(0, ranking.length - 1));
-    ranking.slice(-cut).forEach(team => {
-      team.status = "plate";
-      newlyPlate.push(team);
-    });
+function previewMovers(){
+  return state.courts.filter(c=>c.type==="championship"&&c.teams.length).flatMap(c=>{
+    const rank=sorted(c.teams);
+    const cut=Math.min(state.eliminationCount,Math.max(0,rank.length-1));
+    return rank.slice(-cut);
   });
+}
 
-  const completedRound = state.round;
-  const movedNames = newlyPlate.map(t => t.name);
-  state.history.push({
-    round: completedRound,
-    summary: movedNames.length
-      ? `${movedNames.join(", ")} moved from the Championship to the Plate courts.`
-      : "No teams moved divisions."
-  });
-
-  resetScores();
-  state.round += 1;
-  state.remainingSeconds = state.roundSeconds;
-
-  const champTeams = state.teams.filter(t => t.status === "championship");
-  const plateTeams = state.teams.filter(t => t.status === "plate");
-
-  let layout;
-  if (state.round <= ROUND_LAYOUTS.length) {
-    layout = ROUND_LAYOUTS[state.round - 1];
-  } else {
-    layout = { championship: 1, plate: 3 };
-  }
-
-  // Prevent more active courts than available teams.
-  layout = {
-    championship: Math.min(layout.championship, Math.max(1, champTeams.length)),
-    plate: plateTeams.length ? Math.min(layout.plate, plateTeams.length) : 0
+$("#advanceBtn").addEventListener("click",()=>{
+  const movers=previewMovers();
+  $("#confirmText").textContent=movers.length
+    ?`${movers.map(t=>t.name).join(", ")} will move into Plate play.`
+    :"The tournament will move to the next round.";
+  const dialog=$("#confirmDialog");
+  dialog.showModal();
+  const handler=()=>{
+    dialog.removeEventListener("close",handler);
+    if(dialog.returnValue==="confirm")advanceRound();
   };
+  dialog.addEventListener("close",handler);
+});
 
-  const champSeeded = seedTeams(champTeams);
-  const plateSeeded = seedTeams(plateTeams);
-  state.courts = buildCourts(champSeeded, plateSeeded, layout);
-
-  saveState();
-  render();
+function snapshot(){
+  return JSON.stringify({...state,timerRunning:false,timerId:null,snapshots:[]});
 }
 
-function seedTeams(teams) {
-  // Serpentine-style redistribution based on cumulative score, then random tie break.
-  return [...teams].sort((a, b) => b.totalScore - a.totalScore || Math.random() - 0.5);
-}
-
-function requestAdvance() {
-  const champCourts = state.courts.filter(c => c.type === "championship" && c.teams.length);
-  const moving = champCourts.flatMap(c => {
-    const ranked = sortedTeams(c.teams);
-    const cut = Math.min(state.eliminationCount, Math.max(0, ranked.length - 1));
-    return ranked.slice(-cut).map(t => t.name);
-  });
-
-  dialogMessage.textContent = moving.length
-    ? `The following teams will move to the Plate courts: ${moving.join(", ")}.`
-    : "The tournament will move to the next round.";
-  confirmDialog.showModal();
-
-  confirmDialog.addEventListener("close", function handler() {
-    confirmDialog.removeEventListener("close", handler);
-    if (confirmDialog.returnValue === "confirm") advanceRound();
-  });
-}
-
-function resetTournament() {
-  if (!confirm("Reset the entire tournament and return to setup?")) return;
+function advanceRound(){
   stopTimer();
-  localStorage.removeItem("kqScoreboardState");
+  state.snapshots.push(snapshot());
+  const movers=previewMovers();
+  movers.forEach(t=>t.status="plate");
+  state.history.push({
+    round:state.round,
+    moved:movers.map(t=>t.name)
+  });
+  state.teams.forEach(t=>{t.total+=t.score;t.score=0;});
+  state.round++;
+  state.remaining=state.roundLength;
+  const champ=state.teams.filter(t=>t.status==="championship").sort((a,b)=>b.total-a.total||Math.random()-.5);
+  const plate=state.teams.filter(t=>t.status==="plate").sort((a,b)=>b.total-a.total||Math.random()-.5);
+  const layout=layouts[Math.min(state.round-1,layouts.length-1)];
+  state.courts=makeCourts(champ,plate,layout);
+  persist();render();
+}
+
+$("#undoBtn").addEventListener("click",()=>{
+  if(!state.snapshots.length)return;
+  stopTimer();
+  const previous=JSON.parse(state.snapshots.pop());
+  const remainingSnapshots=[...state.snapshots];
+  state={...previous,snapshots:remainingSnapshots,timerRunning:false,timerId:null};
+  persist();render();
+});
+
+function renderHistory(){
+  const root=$("#history");
+  if(!state.history.length){root.innerHTML='<div class="empty">No completed rounds yet.</div>';return;}
+  root.innerHTML=state.history.slice().reverse().map(h=>`<div class="history-item">
+    <strong>Round ${h.round}</strong>
+    <p>${h.moved.length?esc(h.moved.join(", "))+" moved to Plate play.":"No teams moved."}</p>
+  </div>`).join("");
+}
+
+function persist(){
+  localStorage.setItem("kq-manager",JSON.stringify({...state,timerRunning:false,timerId:null}));
+}
+
+$("#saveBtn").addEventListener("click",()=>{
+  if(!state.round){alert("Start a tournament first.");return;}
+  const blob=new Blob([JSON.stringify({...state,timerRunning:false,timerId:null},null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=`king-queen-round-${state.round}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+$("#loadBtn").addEventListener("click",()=>$("#loadFile").click());
+$("#loadFile").addEventListener("change",async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+    const data=JSON.parse(await file.text());
+    state={...data,timerRunning:false,timerId:null,snapshots:data.snapshots||[]};
+    $("#setupView").classList.add("hidden");
+    $("#tournamentView").classList.remove("hidden");
+    persist();render();
+  }catch{alert("That save file could not be loaded.");}
+  e.target.value="";
+});
+
+$("#resetBtn").addEventListener("click",()=>{
+  if(!confirm("Reset the tournament and return to setup?"))return;
+  stopTimer();
+  localStorage.removeItem("kq-manager");
   location.reload();
-}
-
-function escapeHtml(value) {
-  return value.replace(/[&<>"']/g, ch => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
-  }[ch]));
-}
-
-function generateTeamNames(count) {
-  teamInput.value = Array.from({ length: count }, (_, i) => `Team ${i + 1}`).join("\n");
-  updateEnteredCount();
-}
-
-function updateEnteredCount() {
-  const entered = teamInput.value.split("\n").map(s => s.trim()).filter(Boolean).length;
-  const required = Number(teamCountSelect.value);
-  enteredCount.value = `${entered} / ${required}`;
-}
-
-for (let count = 15; count <= 25; count += 1) {
-  const option = document.createElement("option");
-  option.value = count;
-  option.textContent = `${count} teams`;
-  if (count === 22) option.selected = true;
-  teamCountSelect.appendChild(option);
-}
-
-teamCountSelect.addEventListener("change", () => {
-  generateTeamNames(Number(teamCountSelect.value));
 });
-teamInput.addEventListener("input", updateEnteredCount);
-$("#loadDemoBtn").addEventListener("click", () => {
-  generateTeamNames(Number(teamCountSelect.value));
-});
-$("#startTournamentBtn").addEventListener("click", initialiseTournament);
-$("#startPauseBtn").addEventListener("click", toggleTimer);
-$("#resetTimerBtn").addEventListener("click", resetTimer);
-$("#advanceBtn").addEventListener("click", requestAdvance);
-$("#resetTournamentBtn").addEventListener("click", resetTournament);
 
-if (loadState()) {
-  setupPanel.classList.add("hidden");
-  tournamentPanel.classList.remove("hidden");
-  render();
-} else {
-  generateTeamNames(22);
+$("#exportBtn").addEventListener("click",()=>{
+  const rows=[["Team","Status","Cumulative points"]];
+  [...state.teams].sort((a,b)=>b.total+b.score-(a.total+a.score)).forEach(t=>{
+    rows.push([t.name,t.status,t.total+t.score]);
+  });
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="king-queen-standings.csv";
+  a.click();URL.revokeObjectURL(a.href);
+});
+
+renderTeamInputs(false);
+const saved=localStorage.getItem("kq-manager");
+if(saved){
+  try{
+    const parsed=JSON.parse(saved);
+    if(parsed.round>0&&parsed.teams?.length){
+      state={...parsed,timerRunning:false,timerId:null,snapshots:parsed.snapshots||[]};
+      $("#setupView").classList.add("hidden");
+      $("#tournamentView").classList.remove("hidden");
+      render();
+    }
+  }catch{}
 }

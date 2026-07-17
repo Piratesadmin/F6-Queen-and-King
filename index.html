@@ -1,98 +1,108 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>King & Queen of the Court</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>King & Queen Tournament Manager</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="app-header">
+  <header class="topbar">
     <div>
-      <p class="eyebrow">Tournament Control</p>
+      <div class="eyebrow">Flaming Six Tournament Control</div>
       <h1>King & Queen of the Court</h1>
     </div>
-    <div class="round-badge" id="roundBadge">Setup</div>
+    <div class="top-actions">
+      <button id="saveBtn" class="ghost">Save</button>
+      <button id="loadBtn" class="ghost">Load</button>
+      <button id="resetBtn" class="danger">Reset</button>
+    </div>
   </header>
 
   <main>
-    <section class="panel setup-panel" id="setupPanel">
-      <div class="panel-heading">
+    <section id="setupView" class="card setup-card">
+      <div class="section-head">
         <div>
-          <h2>Team setup</h2>
-          <p>Choose 15–25 teams, then enter one team name per line.</p>
+          <h2>Build your tournament</h2>
+          <p>Choose 15–25 teams, enter names, then let the app balance the courts.</p>
         </div>
-        <button class="secondary" id="loadDemoBtn">Generate team names</button>
       </div>
 
-      <div class="setup-grid">
+      <div class="setup-controls">
         <label>
           Number of teams
           <select id="teamCount"></select>
         </label>
-        <label>
-          Teams entered
-          <input id="enteredCount" value="22 / 22" readonly />
-        </label>
-      </div>
 
-      <label for="teamInput">Team names</label>
-      <textarea id="teamInput" rows="14" placeholder="Team 1&#10;Team 2&#10;Team 3"></textarea>
-
-      <div class="setup-grid">
         <label>
           Round length
           <select id="roundLength">
-            <option value="900" selected>15 minutes</option>
             <option value="600">10 minutes</option>
+            <option value="900" selected>15 minutes</option>
             <option value="1200">20 minutes</option>
           </select>
         </label>
+
         <label>
-          Championship elimination
+          Bottom teams moved per Championship court
           <select id="eliminationCount">
-            <option value="2" selected>Bottom 2 per court</option>
-            <option value="1">Bottom 1 per court</option>
+            <option value="1">1 team</option>
+            <option value="2" selected>2 teams</option>
           </select>
         </label>
       </div>
 
-      <div class="notice">
-        Flow: Round 1 uses four Championship courts. Later rounds progressively free courts for Plate play:
-        3+1, then 2+2, then 1+3.
+      <div class="team-entry-head">
+        <h3>Team names</h3>
+        <span id="teamProgress">0 / 22 complete</span>
       </div>
 
-      <button class="primary large" id="startTournamentBtn">Create tournament</button>
+      <div id="teamInputs" class="team-input-grid"></div>
+
+      <div class="setup-footer">
+        <button id="fillDemoBtn" class="ghost">Fill demo names</button>
+        <button id="startBtn" class="primary">Start tournament</button>
+      </div>
     </section>
 
-    <section class="hidden" id="tournamentPanel">
-      <section class="control-bar panel">
-        <div class="timer-wrap">
-          <span class="timer-label">Round timer</span>
-          <div class="timer" id="timer">15:00</div>
+    <section id="tournamentView" class="hidden">
+      <section class="round-bar card">
+        <div>
+          <div class="eyebrow">Current stage</div>
+          <h2 id="roundTitle">Round 1</h2>
+          <p id="roundSummary"></p>
         </div>
-        <div class="control-actions">
-          <button class="primary" id="startPauseBtn">Start</button>
-          <button class="secondary" id="resetTimerBtn">Reset timer</button>
-          <button class="accent" id="advanceBtn">Finish round & advance</button>
-        </div>
-      </section>
 
-      <section class="status-strip">
-        <div><span>Championship</span><strong id="championshipCount">0</strong></div>
-        <div><span>Plate</span><strong id="plateCount">0</strong></div>
-        <div><span>Total teams</span><strong id="totalCount">0</strong></div>
-      </section>
-
-      <section class="courts-grid" id="courtsGrid"></section>
-
-      <section class="panel history-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>Round history</h2>
-            <p>Automatic court movements are recorded here.</p>
+        <div class="timer-block">
+          <div id="timer" class="timer">15:00</div>
+          <div class="timer-actions">
+            <button id="timerToggleBtn" class="primary">Start timer</button>
+            <button id="timerResetBtn" class="ghost">Reset</button>
           </div>
-          <button class="danger-outline" id="resetTournamentBtn">Reset tournament</button>
+        </div>
+
+        <div class="round-actions">
+          <button id="undoBtn" class="ghost">Undo last round</button>
+          <button id="advanceBtn" class="success">Finish round & advance</button>
+        </div>
+      </section>
+
+      <section class="stats-row">
+        <div class="stat card"><span>Championship</span><strong id="champCount">0</strong></div>
+        <div class="stat card"><span>Plate</span><strong id="plateCount">0</strong></div>
+        <div class="stat card"><span>Teams playing</span><strong id="playingCount">0</strong></div>
+        <div class="stat card"><span>Round</span><strong id="roundNumber">1</strong></div>
+      </section>
+
+      <section id="courts" class="courts-grid"></section>
+
+      <section class="card history-card">
+        <div class="section-head">
+          <div>
+            <h2>Movement history</h2>
+            <p>Teams moved from Championship into Plate play appear here.</p>
+          </div>
+          <button id="exportBtn" class="ghost">Export standings CSV</button>
         </div>
         <div id="history"></div>
       </section>
@@ -101,15 +111,16 @@
 
   <dialog id="confirmDialog">
     <form method="dialog">
-      <h2 id="dialogTitle">Advance tournament?</h2>
-      <p id="dialogMessage"></p>
+      <h2>Finish this round?</h2>
+      <p id="confirmText"></p>
       <div class="dialog-actions">
-        <button value="cancel" class="secondary">Cancel</button>
-        <button value="confirm" class="primary">Confirm</button>
+        <button value="cancel" class="ghost">Cancel</button>
+        <button value="confirm" class="success">Advance</button>
       </div>
     </form>
   </dialog>
 
+  <input id="loadFile" type="file" accept=".json" hidden>
   <script src="app.js"></script>
 </body>
 </html>

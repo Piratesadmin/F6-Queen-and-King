@@ -1,48 +1,40 @@
-# King & Queen of the Court Scoreboard
+# King & Queen Tournament Manager
 
-A static, GitHub Pages-ready tournament scoreboard for a four-court King/Queen of the Court event.
+A browser-based tournament manager for a four-court King & Queen of the Court event.
 
-## Features
+## Main features
 
-- Choose any tournament size from 15 to 25 teams
+- Select 15–25 teams
+- Team-name fields update immediately when the dropdown changes
+- 10, 15 or 20-minute rounds
 - Four live court scoreboards
-- Configurable 10, 15 or 20-minute round timer
-- Add and subtract points
+- Add/subtract King-side points
 - Automatic ranking on each court
-- Highlights the bottom two Championship teams
-- Automatically moves those teams into the Plate competition
-- Automatic court layouts:
-  - Round 1: 4 Championship courts
-  - Round 2: 3 Championship + 1 Plate
-  - Round 3: 2 Championship + 2 Plate
-  - Round 4 onward: 1 Championship + 3 Plate
-- All teams continue playing every round
-- Saves tournament state in the browser using localStorage
-- Responsive for laptop, tablet and phone screens
+- Automatic Championship-to-Plate movement
+- Court progression: 4+0, 3+1, 2+2, then 1+3
+- Undo the previous round
+- Browser autosave
+- Download/load tournament save files
+- Export standings to CSV
+- Responsive phone, tablet and laptop layout
 
-## Publish on GitHub Pages
+## GitHub Pages
 
-1. Create a new GitHub repository.
-2. Upload `index.html`, `styles.css` and `app.js` to the repository root.
-3. In GitHub, open **Settings → Pages**.
-4. Under **Build and deployment**, choose **Deploy from a branch**.
-5. Choose the `main` branch and `/root`, then save.
-6. GitHub will provide the public scoreboard URL.
+1. Create a public GitHub repository.
+2. Upload `index.html`, `styles.css`, and `app.js` to the repository root.
+3. Open **Settings → Pages**.
+4. Select **Deploy from a branch**.
+5. Select `main` and `/ (root)`.
+6. Save and open the URL GitHub provides.
 
-## Tournament logic
+## Match-day use
 
-At the end of each round, click **Finish round & advance**.
+1. Choose the number of teams.
+2. Enter all team names.
+3. Start the tournament.
+4. Add points to teams as they score on the King side.
+5. At the end of the timer, press **Finish round & advance**.
+6. Review the teams moving into Plate play and confirm.
+7. The next round's court assignments are generated automatically.
 
-On every Championship court:
-- Teams are ranked by points.
-- The bottom two move into the Plate group.
-- Remaining Championship teams are redistributed over the correct number of courts.
-- Plate teams are redistributed over the remaining courts.
-- Scores reset for the new round.
-- Cumulative scores are retained internally to help seed teams across courts.
-
-Plate teams are never removed, so everyone continues playing.
-
-## Important operational note
-
-The app currently treats each court's score as the number of points won on the King side during that round. It does not control physical team rotation; the court official still manages who moves on and off the King side.
+The app keeps all teams active. Championship teams compete for the main title, while eliminated teams continue on the Plate courts.
