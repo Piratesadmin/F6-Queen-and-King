@@ -4,6 +4,7 @@ A static, GitHub Pages-ready tournament scoreboard for a four-court King/Queen o
 
 ## Features
 
+- Choose any tournament size from 15 to 25 teams
 - Four live court scoreboards
 - Configurable 10, 15 or 20-minute round timer
 - Add and subtract points

@@ -20,12 +20,23 @@
       <div class="panel-heading">
         <div>
           <h2>Team setup</h2>
-          <p>Enter one team per line. The default format is designed for 22 teams.</p>
+          <p>Choose 15–25 teams, then enter one team name per line.</p>
         </div>
-        <button class="secondary" id="loadDemoBtn">Load 22 demo teams</button>
+        <button class="secondary" id="loadDemoBtn">Generate team names</button>
       </div>
 
-      <label for="teamInput">Teams</label>
+      <div class="setup-grid">
+        <label>
+          Number of teams
+          <select id="teamCount"></select>
+        </label>
+        <label>
+          Teams entered
+          <input id="enteredCount" value="22 / 22" readonly />
+        </label>
+      </div>
+
+      <label for="teamInput">Team names</label>
       <textarea id="teamInput" rows="14" placeholder="Team 1&#10;Team 2&#10;Team 3"></textarea>
 
       <div class="setup-grid">

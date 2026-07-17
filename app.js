@@ -4,6 +4,8 @@ const setupPanel = $("#setupPanel");
 const tournamentPanel = $("#tournamentPanel");
 const courtsGrid = $("#courtsGrid");
 const teamInput = $("#teamInput");
+const teamCountSelect = $("#teamCount");
+const enteredCount = $("#enteredCount");
 const timerEl = $("#timer");
 const roundBadge = $("#roundBadge");
 const championshipCount = $("#championshipCount");
@@ -84,13 +86,14 @@ function buildCourts(champTeams, plateTeams, layout) {
 }
 
 function initialiseTournament() {
+  const requiredTeamCount = Number(teamCountSelect.value);
   const names = teamInput.value
     .split("\n")
     .map(s => s.trim())
     .filter(Boolean);
 
-  if (names.length < 4) {
-    alert("Please enter at least four teams.");
+  if (names.length !== requiredTeamCount) {
+    alert(`Please enter exactly ${requiredTeamCount} team names. You currently have ${names.length}.`);
     return;
   }
 
@@ -348,8 +351,31 @@ function escapeHtml(value) {
   }[ch]));
 }
 
+function generateTeamNames(count) {
+  teamInput.value = Array.from({ length: count }, (_, i) => `Team ${i + 1}`).join("\n");
+  updateEnteredCount();
+}
+
+function updateEnteredCount() {
+  const entered = teamInput.value.split("\n").map(s => s.trim()).filter(Boolean).length;
+  const required = Number(teamCountSelect.value);
+  enteredCount.value = `${entered} / ${required}`;
+}
+
+for (let count = 15; count <= 25; count += 1) {
+  const option = document.createElement("option");
+  option.value = count;
+  option.textContent = `${count} teams`;
+  if (count === 22) option.selected = true;
+  teamCountSelect.appendChild(option);
+}
+
+teamCountSelect.addEventListener("change", () => {
+  generateTeamNames(Number(teamCountSelect.value));
+});
+teamInput.addEventListener("input", updateEnteredCount);
 $("#loadDemoBtn").addEventListener("click", () => {
-  teamInput.value = Array.from({ length: 22 }, (_, i) => `Team ${i + 1}`).join("\n");
+  generateTeamNames(Number(teamCountSelect.value));
 });
 $("#startTournamentBtn").addEventListener("click", initialiseTournament);
 $("#startPauseBtn").addEventListener("click", toggleTimer);
@@ -362,5 +388,5 @@ if (loadState()) {
   tournamentPanel.classList.remove("hidden");
   render();
 } else {
-  teamInput.value = Array.from({ length: 22 }, (_, i) => `Team ${i + 1}`).join("\n");
+  generateTeamNames(22);
 }
