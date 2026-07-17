@@ -123,17 +123,51 @@ function render(){
   $("#plateCount").textContent=plate.length;
   $("#playingCount").textContent=state.teams.length;
   const layout=layouts[Math.min(state.round-1,layouts.length-1)];
-  $("#roundSummary").textContent=`${layout.championship} Championship court${layout.championship===1?"":"s"} and ${layout.plate} Plate court${layout.plate===1?"":"s"}.`;
+  if(state.round===3){
+    $("#roundSummary").textContent="Semifinal: each court winner plus the best third-placed team reach the three-team final.";
+  }else if(state.round>=4){
+    $("#roundSummary").textContent=`Final on 1 Championship court, with ${layout.plate} Plate courts keeping everyone else playing.`;
+  }else{
+    $("#roundSummary").textContent=`${layout.championship} Championship court${layout.championship===1?"":"s"} and ${layout.plate} Plate court${layout.plate===1?"":"s"}.`;
+  }
   renderCourts();
   renderHistory();
   $("#undoBtn").disabled=!state.snapshots.length;
 }
 
+function getRoundOutcome(){
+  const champCourts=state.courts.filter(c=>c.type==="championship"&&c.teams.length);
+
+  // Round 3 semifinal: the winner of each court qualifies, plus the
+  // best third-placed team across both Championship courts.
+  if(state.round===3 && champCourts.length===2){
+    const rankings=champCourts.map(c=>sorted(c.teams));
+    const thirdPlaced=rankings.map(r=>r[2]).filter(Boolean);
+    const wildcard=thirdPlaced.sort((a,b)=>
+      b.score-a.score || b.total-a.total || a.name.localeCompare(b.name)
+    )[0] || null;
+    const qualifiers=new Set();
+    rankings.forEach(r=>r.slice(0,1).forEach(t=>qualifiers.add(t.id)));
+    if(wildcard)qualifiers.add(wildcard.id);
+    const movers=rankings.flat().filter(t=>!qualifiers.has(t.id));
+    const winners=rankings.map(r=>r[0]).filter(Boolean);
+    return {movers,wildcard,winners};
+  }
+
+  const movers=champCourts.flatMap(c=>{
+    const rank=sorted(c.teams);
+    const cut=Math.min(state.eliminationCount,Math.max(0,rank.length-1));
+    return rank.slice(-cut);
+  });
+  return {movers,wildcard:null};
+}
+
 function renderCourts(){
   const root=$("#courts");root.innerHTML="";
+  const outcome=getRoundOutcome();
   state.courts.forEach(court=>{
     const list=sorted(court.teams);
-    const dropStart=court.type==="championship"?Math.max(0,list.length-state.eliminationCount):Infinity;
+    const moverIds=new Set(outcome.movers.map(t=>t.id));
     const article=document.createElement("article");
     article.className="court card";
     article.innerHTML=`<div class="court-head">
@@ -146,10 +180,19 @@ function renderCourts(){
     }else{
       list.forEach((team,index)=>{
         const row=document.createElement("div");
-        row.className="team-row"+(index===0?" leader":"")+(index>=dropStart&&court.type==="championship"?" drop":"");
-        const moving=index>=dropStart&&court.type==="championship";
+        const moving=court.type==="championship"&&moverIds.has(team.id);
+        const wildcard=state.round===3&&outcome.wildcard&&outcome.wildcard.id===team.id;
+        row.className="team-row"+(index===0?" leader":"")+(moving?" drop":"");
+        let status=index===0?"Leading":`Position ${index+1}`;
+        if(state.round===3&&court.type==="championship"&&index===0){
+          status="Court winner · qualifies for final";
+        }else if(wildcard){
+          status="Position 3 · best third place · qualifies for final";
+        }else if(moving){
+          status+=" · moves to Plate";
+        }
         row.innerHTML=`<div><div class="team-name">${esc(team.name)}</div>
-          <div class="team-sub">${index===0?"Leading":`Position ${index+1}`}${moving?" · moves to Plate":""}</div></div>
+          <div class="team-sub">${status}</div></div>
           <div class="scorebox"><button class="ghost minus">−</button><div class="score">${team.score}</div><button class="primary plus">+</button></div>`;
         row.querySelector(".minus").onclick=()=>changeScore(team.id,-1);
         row.querySelector(".plus").onclick=()=>changeScore(team.id,1);
@@ -193,18 +236,20 @@ $("#timerToggleBtn").addEventListener("click",()=>{
 $("#timerResetBtn").addEventListener("click",()=>{stopTimer();state.remaining=state.roundLength;renderTimer();persist();});
 
 function previewMovers(){
-  return state.courts.filter(c=>c.type==="championship"&&c.teams.length).flatMap(c=>{
-    const rank=sorted(c.teams);
-    const cut=Math.min(state.eliminationCount,Math.max(0,rank.length-1));
-    return rank.slice(-cut);
-  });
+  return getRoundOutcome().movers;
 }
 
 $("#advanceBtn").addEventListener("click",()=>{
-  const movers=previewMovers();
-  $("#confirmText").textContent=movers.length
-    ?`${movers.map(t=>t.name).join(", ")} will move into Plate play.`
-    :"The tournament will move to the next round.";
+  const outcome=getRoundOutcome();
+  const movers=outcome.movers;
+  if(state.round===3 && outcome.wildcard){
+    const winnerNames=(outcome.winners||[]).map(t=>t.name).join(" and ");
+    $("#confirmText").textContent=`${winnerNames} qualify as the two court winners. ${outcome.wildcard.name} qualifies as the best third-placed team. The final will therefore have three teams. ${movers.map(t=>t.name).join(", ")} will move into Plate play.`;
+  }else{
+    $("#confirmText").textContent=movers.length
+      ?`${movers.map(t=>t.name).join(", ")} will move into Plate play.`
+      :"The tournament will move to the next round.";
+  }
   const dialog=$("#confirmDialog");
   dialog.showModal();
   const handler=()=>{
@@ -223,9 +268,14 @@ function advanceRound(){
   state.snapshots.push(snapshot());
   const movers=previewMovers();
   movers.forEach(t=>t.status="plate");
+  const outcome=getRoundOutcome();
   state.history.push({
     round:state.round,
-    moved:movers.map(t=>t.name)
+    moved:movers.map(t=>t.name),
+    finalists:state.round===3
+      ?[...(outcome.winners||[]),outcome.wildcard].filter(Boolean).map(t=>t.name)
+      :[],
+    wildcard:state.round===3?outcome.wildcard?.name:null
   });
   state.teams.forEach(t=>{t.total+=t.score;t.score=0;});
   state.round++;
@@ -251,7 +301,10 @@ function renderHistory(){
   if(!state.history.length){root.innerHTML='<div class="empty">No completed rounds yet.</div>';return;}
   root.innerHTML=state.history.slice().reverse().map(h=>`<div class="history-item">
     <strong>Round ${h.round}</strong>
-    <p>${h.moved.length?esc(h.moved.join(", "))+" moved to Plate play.":"No teams moved."}</p>
+    <p>${h.finalists?.length
+      ?`${esc(h.finalists.join(", "))} qualified for the three-team final. ${esc(h.wildcard)} advanced as the best third-placed team.`
+      :(h.moved.length?esc(h.moved.join(", "))+" moved to Plate play.":"No teams moved.")
+    }</p>
   </div>`).join("");
 }
 
