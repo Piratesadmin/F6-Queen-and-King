@@ -124,7 +124,7 @@ function render(){
   $("#playingCount").textContent=state.teams.length;
   const layout=layouts[Math.min(state.round-1,layouts.length-1)];
   if(state.round===3){
-    $("#roundSummary").textContent="Semifinal: each court winner plus the best third-placed team reach the three-team final.";
+    $("#roundSummary").textContent="Semifinal: the top two from each court plus the best third-placed team reach the five-team final.";
   }else if(state.round>=4){
     $("#roundSummary").textContent=`Final on 1 Championship court, with ${layout.plate} Plate courts keeping everyone else playing.`;
   }else{
@@ -148,11 +148,11 @@ function getRoundOutcome(){
       b.score-a.score || b.total-a.total || a.name.localeCompare(b.name)
     )[0] || null;
     const qualifiers=new Set();
-    rankings.forEach(r=>r.slice(0,1).forEach(t=>qualifiers.add(t.id)));
+    rankings.forEach(r=>r.slice(0,2).forEach(t=>qualifiers.add(t.id)));
     if(wildcard)qualifiers.add(wildcard.id);
     const movers=rankings.flat().filter(t=>!qualifiers.has(t.id));
-    const winners=rankings.map(r=>r[0]).filter(Boolean);
-    return {movers,wildcard,winners};
+    const automaticQualifiers=rankings.flatMap(r=>r.slice(0,2)).filter(Boolean);
+    return {movers,wildcard,automaticQualifiers};
   }
 
   const movers=champCourts.flatMap(c=>{
@@ -188,8 +188,8 @@ function renderCourts(){
         const wildcard=state.round===3&&outcome.wildcard&&outcome.wildcard.id===team.id;
         row.className="team-row"+(index===0?" leader":"")+(moving?" drop":"");
         let status=index===0?"Leading":`Position ${index+1}`;
-        if(state.round===3&&court.type==="championship"&&index===0){
-          status="Court winner · qualifies for final";
+        if(state.round===3&&court.type==="championship"&&index<2){
+          status=`Position ${index+1} · qualifies for final`;
         }else if(wildcard){
           status="Position 3 · best third place · qualifies for final";
         }else if(moving){
@@ -249,8 +249,8 @@ $("#advanceBtn").addEventListener("click",()=>{
   const outcome=getRoundOutcome();
   const movers=outcome.movers;
   if(state.round===3 && outcome.wildcard){
-    const winnerNames=(outcome.winners||[]).map(t=>t.name).join(" and ");
-    $("#confirmText").textContent=`${winnerNames} qualify as the two court winners. ${outcome.wildcard.name} qualifies as the best third-placed team. The final will therefore have three teams. ${movers.map(t=>t.name).join(", ")} will move into Plate play.`;
+    const qualifierNames=(outcome.automaticQualifiers||[]).map(t=>t.name).join(", ");
+    $("#confirmText").textContent=`${qualifierNames} qualify by finishing in the top two on their courts. ${outcome.wildcard.name} qualifies as the best third-placed team. The final will therefore have five teams. ${movers.map(t=>t.name).join(", ")} will move into Plate play.`;
   }else{
     $("#confirmText").textContent=movers.length
       ?`${movers.map(t=>t.name).join(", ")} will move into Plate play.`
@@ -279,7 +279,7 @@ function advanceRound(){
     round:state.round,
     moved:movers.map(t=>t.name),
     finalists:state.round===3
-      ?[...(outcome.winners||[]),outcome.wildcard].filter(Boolean).map(t=>t.name)
+      ?[...(outcome.automaticQualifiers||[]),outcome.wildcard].filter(Boolean).map(t=>t.name)
       :[],
     wildcard:state.round===3?outcome.wildcard?.name:null
   });
@@ -340,7 +340,7 @@ function renderHistory(){
   root.innerHTML=state.history.slice().reverse().map(h=>`<div class="history-item">
     <strong>Round ${h.round}</strong>
     <p>${h.finalists?.length
-      ?`${esc(h.finalists.join(", "))} qualified for the three-team final. ${esc(h.wildcard)} advanced as the best third-placed team.`
+      ?`${esc(h.finalists.join(", "))} qualified for the five-team final. ${esc(h.wildcard)} advanced as the best third-placed team.`
       :(h.moved.length?esc(h.moved.join(", "))+" moved to Plate play.":"No teams moved.")
     }</p>
   </div>`).join("");

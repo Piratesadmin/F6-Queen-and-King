@@ -40,14 +40,14 @@ A browser-based tournament manager for a four-court King & Queen of the Court ev
 The app keeps all teams active. Championship teams compete for the main title, while eliminated teams continue on the Plate courts.
 
 
-## Three-team final
+## Five-team final
 
 Round 3 contains eight Championship teams split across two courts of four.
 
-Exactly three teams qualify for the final:
+Exactly five teams qualify for the final:
 
-- The first-place team on Championship Court 1
-- The first-place team on Championship Court 2
+- The first- and second-place teams on Championship Court 1
+- The first- and second-place teams on Championship Court 2
 - The higher-scoring third-place team across the two courts
 
 The best-third-place tie-break is:
@@ -56,7 +56,7 @@ The best-third-place tie-break is:
 2. Cumulative tournament score
 3. Team name alphabetically
 
-Second-place teams do not qualify under this format. All non-qualifiers move into Plate play.
+All other teams move into Plate play.
 
 
 ## Minimum two progressing from each court
