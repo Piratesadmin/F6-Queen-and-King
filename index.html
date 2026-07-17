@@ -66,6 +66,24 @@
     </section>
 
     <section id="tournamentView" class="hidden">
+      <button id="teamSidebarToggle" class="sidebar-toggle ghost" type="button" aria-controls="teamSidebar" aria-expanded="true">Hide teams</button>
+      <div class="tournament-layout">
+        <aside id="teamSidebar" class="team-sidebar card" aria-label="Team participation controls">
+          <div class="sidebar-head">
+            <div>
+              <div class="eyebrow">Participation</div>
+              <h2>Teams</h2>
+            </div>
+            <button id="teamSidebarClose" class="ghost sidebar-close" type="button" aria-label="Hide team sidebar">×</button>
+          </div>
+          <p class="sidebar-copy">Untick a team to withdraw them from further play. Their existing points are kept.</p>
+          <div class="sidebar-actions">
+            <button id="selectAllTeamsBtn" class="ghost" type="button">Select all</button>
+            <button id="clearAllTeamsBtn" class="ghost" type="button">Clear all</button>
+          </div>
+          <div id="teamChecklist" class="team-checklist"></div>
+        </aside>
+        <div class="tournament-main">
       <section class="round-bar card">
         <div>
           <div class="eyebrow">Current stage</div>
@@ -85,6 +103,17 @@
           <button id="undoBtn" class="ghost">Undo last round</button>
           <button id="advanceBtn" class="success">Finish round & advance</button>
         </div>
+      </section>
+
+      <section class="card court-control-card">
+        <div class="section-head">
+          <div>
+            <h2>Available courts</h2>
+            <p>Untick any court that is no longer available. The current round will be rescheduled automatically.</p>
+          </div>
+          <div id="courtWarning" class="court-warning hidden"></div>
+        </div>
+        <div id="courtAvailability" class="court-checks"></div>
       </section>
 
       <section class="stats-row">
@@ -130,6 +159,8 @@
         </div>
         <div id="history"></div>
       </section>
+        </div>
+      </div>
     </section>
   </main>
 

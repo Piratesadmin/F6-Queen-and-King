@@ -119,3 +119,31 @@ When Round 2 has only two active Championship courts:
 
 The best-third-place tie-break remains Round 3 score, then cumulative score,
 then team name alphabetically.
+
+
+## Court availability controls
+
+The tournament screen now has tick boxes for Courts 1–4.
+
+- Unticking a court removes it from play immediately
+- Current scores are preserved
+- Teams are automatically redistributed across the remaining courts
+- Championship play always receives priority
+- Before the final, one available court is reserved for Plate play whenever possible
+- If only one court is available, Championship continues and Plate play is temporarily paused
+- In the final, Championship uses one court and all other available courts are used for Plate play
+- Reticking a court automatically adds it back and reschedules the current round
+
+The app displays a warning whenever limited court availability pauses or reduces Plate play.
+
+
+## Hideable team sidebar
+
+- Shows every team with a participation checkbox
+- Unticking a team withdraws them from further play
+- Their existing score and cumulative points are preserved
+- The current round is immediately rescheduled
+- Withdrawn teams remain visible in the live standings
+- Reticking restores the team to its previous Championship or Plate competition
+- The sidebar can be hidden and reopened
+- Select All and Clear All controls are included

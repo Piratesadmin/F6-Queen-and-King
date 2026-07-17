@@ -17,7 +17,9 @@ let state = {
   history:[],
   snapshots:[],
   timerRunning:false,
-  timerId:null
+  timerId:null,
+  availableCourts:[1,2,3,4],
+  teamSidebarVisible:true
 };
 
 const teamCount = $("#teamCount");
@@ -72,57 +74,73 @@ function distribute(items,count){
 }
 
 function makeCourts(champ,plate,layout){
+  const available=(state.availableCourts?.length?state.availableCourts:[1,2,3,4])
+    .slice().sort((a,b)=>a-b);
+  const activeCourtCount=available.length;
   const courts=[];
   const smallEvent=state.teams.length>=15&&state.teams.length<=19;
-  let champCourtCount;
+  const finalRound=state.round>=4;
 
-  if(state.round===3&&champ.length===6){
-    // Special pathway: six remaining Championship teams must play
-    // on two semifinal courts of three.
-    champCourtCount=2;
+  if(activeCourtCount===0)return [];
+
+  let desiredChampCourts;
+
+  if(finalRound){
+    desiredChampCourts=champ.length?1:0;
+  }else if(state.round===3&&champ.length===6){
+    desiredChampCourts=2;
   }else if(smallEvent&&state.round>=2&&champ.length>=4){
-    // In smaller events, use one Championship court for every four
-    // Championship teams instead of forcing the round template's court count.
-    // Example: 8 Championship teams become two courts of four, leaving
-    // the other two courts available for Plate play.
-    champCourtCount=Math.min(4,Math.max(1,Math.floor(champ.length/4)));
+    desiredChampCourts=Math.min(4,Math.max(1,Math.floor(champ.length/4)));
   }else{
-    champCourtCount=Math.min(layout.championship,Math.max(1,champ.length));
+    desiredChampCourts=Math.min(layout.championship,Math.max(1,champ.length));
   }
 
-  const championshipGroups=distribute(champ,champCourtCount);
-  championshipGroups.forEach(group=>{
+  // Before the final, reserve one court for Plate whenever Plate teams exist,
+  // but Championship has priority if only one court is available.
+  let maxChampCourts=activeCourtCount;
+  if(!finalRound&&plate.length&&activeCourtCount>1){
+    maxChampCourts=activeCourtCount-1;
+  }
+
+  const champCourtCount=champ.length
+    ?Math.max(1,Math.min(desiredChampCourts,maxChampCourts))
+    :0;
+
+  const champGroups=champCourtCount?distribute(champ,champCourtCount):[];
+  champGroups.forEach((group,index)=>{
     courts.push({
-      number:courts.length+1,
+      number:available[index],
       type:"championship",
       teams:group
     });
   });
 
-  // Every court not required for Championship play becomes a Plate court.
-  // This lets all Plate teams be balanced across the remaining courts.
-  const availablePlateCourts=Math.max(0,4-courts.length);
-  if(plate.length&&availablePlateCourts){
-    distribute(plate,Math.min(availablePlateCourts,plate.length)).forEach(group=>{
+  const remainingCourtNumbers=available.slice(champCourtCount);
+  if(plate.length&&remainingCourtNumbers.length){
+    const plateGroups=distribute(
+      plate,
+      Math.min(remainingCourtNumbers.length,plate.length)
+    );
+    plateGroups.forEach((group,index)=>{
       courts.push({
-        number:courts.length+1,
+        number:remainingCourtNumbers[index],
         type:"plate",
         teams:group
       });
     });
   }
 
-  while(courts.length<4){
-    courts.push({
-      number:courts.length+1,
-      type:"plate",
-      teams:[]
-    });
-  }
+  // Keep unused but available courts visible.
+  remainingCourtNumbers.slice(
+    plate.length?Math.min(remainingCourtNumbers.length,plate.length):0
+  ).forEach(number=>{
+    if(!courts.some(c=>c.number===number)){
+      courts.push({number,type:"plate",teams:[]});
+    }
+  });
 
-  return courts.slice(0,4);
+  return courts.sort((a,b)=>a.number-b.number);
 }
-
 function startTournament(){
   const names=[...document.querySelectorAll("#teamInputs input")].map(i=>i.value.trim());
   if(names.some(n=>!n))return;
@@ -131,12 +149,17 @@ function startTournament(){
     roundLength:Number($("#roundLength").value),
     remaining:Number($("#roundLength").value),
     eliminationCount:Number($("#eliminationCount").value),
-    teams:names.map(name=>({id:id(),name,status:"championship",score:0,total:0})),
+    teams:names.map(name=>({
+      id:id(),name,status:"championship",previousStatus:"championship",
+      active:true,score:0,total:0
+    })),
     courts:[],
     history:[],
     snapshots:[],
     timerRunning:false,
-    timerId:null
+    timerId:null,
+    availableCourts:[1,2,3,4],
+    teamSidebarVisible:true
   };
   const shuffled=[...state.teams].sort(()=>Math.random()-.5);
   state.courts=makeCourts(shuffled,[],layouts[0]);
@@ -151,15 +174,154 @@ function sorted(teams){
   return [...teams].sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name));
 }
 
+
+
+function renderTeamSidebar(){
+  const sidebar=$("#teamSidebar"), toggle=$("#teamSidebarToggle"), root=$("#teamChecklist");
+  if(!sidebar||!toggle||!root)return;
+  const visible=state.teamSidebarVisible!==false;
+  sidebar.classList.toggle("hidden-sidebar",!visible);
+  toggle.textContent=visible?"Hide teams":"Show teams";
+  toggle.setAttribute("aria-expanded",String(visible));
+
+  root.innerHTML=[...state.teams].sort((a,b)=>a.name.localeCompare(b.name)).map(team=>{
+    const active=team.active!==false&&team.status!=="withdrawn";
+    const label=active?(team.status==="championship"?"Championship":"Plate"):"Withdrawn";
+    return `<label class="team-check-row ${active?"":"withdrawn"}">
+      <input type="checkbox" data-team-id="${team.id}" ${active?"checked":""}>
+      <span class="team-check-name">${esc(team.name)}
+        <span class="team-check-meta">${label} · ${team.total+team.score} pts</span>
+      </span>
+    </label>`;
+  }).join("");
+
+  root.querySelectorAll("input").forEach(input=>{
+    input.addEventListener("change",()=>setTeamActive(input.dataset.teamId,input.checked));
+  });
+}
+
+function setTeamActive(teamId,isActive){
+  const team=state.teams.find(t=>t.id===teamId);
+  if(!team)return;
+
+  if(isActive){
+    team.active=true;
+    team.status=team.previousStatus||"plate";
+  }else{
+    const activeCount=state.teams.filter(t=>t.active!==false&&t.status!=="withdrawn").length;
+    if(activeCount<=1){
+      alert("At least one team must remain active.");
+      renderTeamSidebar();
+      return;
+    }
+    if(team.status!=="withdrawn")team.previousStatus=team.status;
+    team.active=false;
+    team.status="withdrawn";
+  }
+  rescheduleCurrentRound();
+}
+
+function setAllTeamsActive(makeActive){
+  const ordered=[...state.teams].sort((a,b)=>a.name.localeCompare(b.name));
+  ordered.forEach((team,index)=>{
+    if(makeActive||index===0){
+      team.active=true;
+      team.status=team.previousStatus||(team.status==="withdrawn"?"plate":team.status);
+    }else{
+      if(team.status!=="withdrawn")team.previousStatus=team.status;
+      team.active=false;
+      team.status="withdrawn";
+    }
+  });
+  rescheduleCurrentRound();
+}
+
+function toggleTeamSidebar(force){
+  state.teamSidebarVisible=typeof force==="boolean"?force:state.teamSidebarVisible===false;
+  persist();
+  renderTeamSidebar();
+}
+
+function renderCourtAvailability(){
+  const root=$("#courtAvailability");
+  if(!root)return;
+
+  const available=new Set(state.availableCourts||[1,2,3,4]);
+  root.innerHTML=[1,2,3,4].map(number=>`
+    <label class="court-check ${available.has(number)?"":"unavailable"}">
+      <input type="checkbox" data-court="${number}" ${available.has(number)?"checked":""}>
+      Court ${number}
+    </label>
+  `).join("");
+
+  root.querySelectorAll("input").forEach(input=>{
+    input.addEventListener("change",()=>{
+      const number=Number(input.dataset.court);
+      const next=new Set(state.availableCourts||[1,2,3,4]);
+
+      if(input.checked)next.add(number);
+      else next.delete(number);
+
+      if(next.size===0){
+        input.checked=true;
+        alert("At least one court must remain available.");
+        return;
+      }
+
+      state.availableCourts=[...next].sort((a,b)=>a-b);
+      rescheduleCurrentRound();
+    });
+  });
+}
+
+function rescheduleCurrentRound(){
+  stopTimer();
+
+  const champ=state.teams
+    .filter(t=>t.active!==false&&t.status==="championship")
+    .sort((a,b)=>b.score-a.score||b.total-a.total||a.name.localeCompare(b.name));
+  const plate=state.teams
+    .filter(t=>t.active!==false&&t.status==="plate")
+    .sort((a,b)=>b.score-a.score||b.total-a.total||a.name.localeCompare(b.name));
+  const layout=layouts[Math.min(state.round-1,layouts.length-1)];
+
+  state.courts=makeCourts(champ,plate,layout);
+  persist();
+  render();
+}
+
+function updateCourtWarning(){
+  const warning=$("#courtWarning");
+  if(!warning)return;
+
+  const available=state.availableCourts?.length||4;
+  const champTeams=state.teams.filter(t=>t.status==="championship").length;
+  const plateTeams=state.teams.filter(t=>t.status==="plate").length;
+  let message="";
+
+  if(available===1&&plateTeams&&state.round<4){
+    message="Only one court is available, so Championship has priority. Plate play is paused until another court becomes available.";
+  }else if(state.round===3&&champTeams===6&&available<3&&plateTeams){
+    message="Two courts are being used for the Championship semifinals, so Plate play is paused until a third court is available.";
+  }else if(state.round<4&&plateTeams&&available>1){
+    message="Championship has priority and one available court is reserved for Plate play.";
+  }else if(state.round>=4){
+    message="Final round: Championship uses one court and every remaining available court is assigned to Plate play.";
+  }
+
+  warning.textContent=message;
+  warning.classList.toggle("hidden",!message);
+}
+
 function render(){
   renderTimer();
   $("#roundTitle").textContent=`Round ${state.round}`;
   $("#roundNumber").textContent=state.round;
-  const champ=state.teams.filter(t=>t.status==="championship");
-  const plate=state.teams.filter(t=>t.status==="plate");
+  const champ=state.teams.filter(t=>t.active!==false&&t.status==="championship");
+  const plate=state.teams.filter(t=>t.active!==false&&t.status==="plate");
   $("#champCount").textContent=champ.length;
   $("#plateCount").textContent=plate.length;
-  $("#playingCount").textContent=state.teams.length;
+  $("#playingCount").textContent=champ.length+plate.length;
   const layout=layouts[Math.min(state.round-1,layouts.length-1)];
   const activeChampCourts=state.courts.filter(c=>c.type==="championship"&&c.teams.length).length;
   const activePlateCourts=state.courts.filter(c=>c.type==="plate"&&c.teams.length).length;
@@ -180,6 +342,9 @@ function render(){
       `${activeChampCourts} Championship court${activeChampCourts===1?"":"s"} and `+
       `${activePlateCourts} active Plate court${activePlateCourts===1?"":"s"}.`;
   }
+  renderTeamSidebar();
+  renderCourtAvailability();
+  updateCourtWarning();
   renderCourts();
   renderStandings();
   renderHistory();
@@ -261,6 +426,17 @@ function renderCourts(){
         box.appendChild(row);
       });
     }
+    root.appendChild(article);
+  });
+
+  const activeNumbers=new Set(state.courts.map(c=>c.number));
+  [1,2,3,4].filter(n=>!activeNumbers.has(n)).forEach(number=>{
+    const article=document.createElement("article");
+    article.className="court card";
+    article.innerHTML=`<div class="court-head">
+      <div class="court-title">Court ${number}</div>
+      <div class="badge plate">Unavailable</div>
+    </div><div class="empty">This court has been unticked and is not in use.</div>`;
     root.appendChild(article);
   });
 }
@@ -345,11 +521,11 @@ function advanceRound(){
       :[],
     wildcard:state.round===3?outcome.wildcard?.name:null
   });
-  state.teams.forEach(t=>{t.total+=t.score;t.score=0;});
+  state.teams.forEach(t=>{if(t.active!==false&&t.status!=="withdrawn"){t.total+=t.score;t.score=0;}});
   state.round++;
   state.remaining=state.roundLength;
-  const champ=state.teams.filter(t=>t.status==="championship").sort((a,b)=>b.total-a.total||Math.random()-.5);
-  const plate=state.teams.filter(t=>t.status==="plate").sort((a,b)=>b.total-a.total||Math.random()-.5);
+  const champ=state.teams.filter(t=>t.active!==false&&t.status==="championship").sort((a,b)=>b.total-a.total||Math.random()-.5);
+  const plate=state.teams.filter(t=>t.active!==false&&t.status==="plate").sort((a,b)=>b.total-a.total||Math.random()-.5);
   const layout=layouts[Math.min(state.round-1,layouts.length-1)];
   state.courts=makeCourts(champ,plate,layout);
   persist();render();
@@ -360,12 +536,20 @@ $("#undoBtn").addEventListener("click",()=>{
   stopTimer();
   const previous=JSON.parse(state.snapshots.pop());
   const remainingSnapshots=[...state.snapshots];
-  state={...previous,snapshots:remainingSnapshots,timerRunning:false,timerId:null};
-  persist();render();
+  state={
+    ...previous,
+    snapshots:remainingSnapshots,
+    timerRunning:false,
+    timerId:null,
+    availableCourts:previous.availableCourts?.length?previous.availableCourts:[1,2,3,4]
+  };
+  normalizeTeamState();persist();render();
 });
 
 
 function teamCourt(teamId){
+  const team=state.teams.find(t=>t.id===teamId);
+  if(team?.status==="withdrawn"||team?.active===false)return "Withdrawn";
   const court=state.courts.find(c=>c.teams.some(t=>t.id===teamId));
   return court?`Court ${court.number}`:"—";
 }
@@ -375,7 +559,8 @@ function renderStandings(){
   if(!body)return;
 
   const ranked=[...state.teams].sort((a,b)=>{
-    const statusOrder=(a.status==="championship"?0:1)-(b.status==="championship"?0:1);
+    const order=s=>s==="championship"?0:s==="plate"?1:2;
+    const statusOrder=order(a.status)-order(b.status);
     if(statusOrder!==0)return statusOrder;
 
     const totalA=a.total+a.score;
@@ -388,7 +573,10 @@ function renderStandings(){
     return `<tr class="${index===0?"current-leader":""}">
       <td class="rank-cell">${index+1}</td>
       <td class="team-cell">${esc(team.name)}</td>
-      <td><span class="comp-chip ${team.status}">${esc(team.status)}</span></td>
+      <td>${team.status==="withdrawn"
+        ?'<span class="withdrawn-chip">Withdrawn</span>'
+        :`<span class="comp-chip ${team.status}">${esc(team.status)}</span>`
+      }</td>
       <td>${teamCourt(team.id)}</td>
       <td class="numeric">${team.score}</td>
       <td class="numeric">${total}</td>
@@ -406,6 +594,16 @@ function renderHistory(){
       :(h.moved.length?esc(h.moved.join(", "))+" moved to Plate play.":"No teams moved.")
     }</p>
   </div>`).join("");
+}
+
+
+function normalizeTeamState(){
+  state.teamSidebarVisible=state.teamSidebarVisible!==false;
+  state.teams=state.teams.map(team=>({
+    ...team,
+    active:team.active!==false&&team.status!=="withdrawn",
+    previousStatus:team.previousStatus||(team.status==="withdrawn"?"plate":team.status)
+  }));
 }
 
 function persist(){
@@ -427,13 +625,24 @@ $("#loadFile").addEventListener("change",async e=>{
   const file=e.target.files[0];if(!file)return;
   try{
     const data=JSON.parse(await file.text());
-    state={...data,timerRunning:false,timerId:null,snapshots:data.snapshots||[]};
+    state={
+      ...data,
+      timerRunning:false,
+      timerId:null,
+      snapshots:data.snapshots||[],
+      availableCourts:data.availableCourts?.length?data.availableCourts:[1,2,3,4]
+    };
     $("#setupView").classList.add("hidden");
     $("#tournamentView").classList.remove("hidden");
-    persist();render();
+    normalizeTeamState();persist();render();
   }catch{alert("That save file could not be loaded.");}
   e.target.value="";
 });
+
+$("#teamSidebarToggle").addEventListener("click",()=>toggleTeamSidebar());
+$("#teamSidebarClose").addEventListener("click",()=>toggleTeamSidebar(false));
+$("#selectAllTeamsBtn").addEventListener("click",()=>setAllTeamsActive(true));
+$("#clearAllTeamsBtn").addEventListener("click",()=>setAllTeamsActive(false));
 
 $("#resetBtn").addEventListener("click",()=>{
   if(!confirm("Reset the tournament and return to setup?"))return;
@@ -460,9 +669,16 @@ if(saved){
   try{
     const parsed=JSON.parse(saved);
     if(parsed.round>0&&parsed.teams?.length){
-      state={...parsed,timerRunning:false,timerId:null,snapshots:parsed.snapshots||[]};
+      state={
+        ...parsed,
+        timerRunning:false,
+        timerId:null,
+        snapshots:parsed.snapshots||[],
+        availableCourts:parsed.availableCourts?.length?parsed.availableCourts:[1,2,3,4]
+      };
       $("#setupView").classList.add("hidden");
       $("#tournamentView").classList.remove("hidden");
+      normalizeTeamState();
       render();
     }
   }catch{}
