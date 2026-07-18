@@ -228,3 +228,13 @@ dialog::backdrop{background:rgba(0,0,0,.72)}
   width:100%;
   max-width:none;
 }
+
+.setup-note{
+  margin:.15rem 0 1rem;
+  padding:.75rem .9rem;
+  border:1px solid var(--line);
+  border-radius:12px;
+  color:var(--muted);
+  background:rgba(255,255,255,.025);
+}
+.setup-note strong{color:var(--text)}

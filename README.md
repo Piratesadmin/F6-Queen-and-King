@@ -163,3 +163,13 @@ The hidden Teams sidebar now changes the tournament wrapper from a grid into a
 full-width block layout. Width limits are explicitly removed from the
 tournament view, main content area, round controls, court controls, statistics,
 scoreboards, standings, and history panels.
+
+
+## Team range and automatic starting courts
+
+The tournament now accepts 8–22 teams.
+
+- 8–12 teams start with Courts 1 and 2 available
+- 13–22 teams start with all four courts available
+- Courts 3 and 4 remain visible in the court controls and can be enabled later
+- All existing court-priority, Plate, withdrawal, timer, standings, and progression rules remain active

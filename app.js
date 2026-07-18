@@ -23,10 +23,10 @@ let state = {
 };
 
 const teamCount = $("#teamCount");
-for(let n=15;n<=25;n++){
+for(let n=8;n<=22;n++){
   const o=document.createElement("option");
   o.value=n;o.textContent=n;
-  if(n===22)o.selected=true;
+  if(n===16)o.selected=true;
   teamCount.appendChild(o);
 }
 
@@ -158,7 +158,9 @@ function startTournament(){
     snapshots:[],
     timerRunning:false,
     timerId:null,
-    availableCourts:[1,2,3,4],
+    // Smaller tournaments begin on two courts only. Courts 3 and 4 can
+    // still be enabled later from the Available courts panel.
+    availableCourts:names.length<=12?[1,2]:[1,2,3,4],
     teamSidebarVisible:true
   };
   const shuffled=[...state.teams].sort(()=>Math.random()-.5);
